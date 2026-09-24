@@ -1,6 +1,6 @@
 # figma-to-roblox-ui
 
-A Claude skill for importing Figma frames and designs into Roblox Studio GUI with high fidelity.
+A skill for Claude and a Codex plugin for importing Figma frames and designs into Roblox Studio GUI with high fidelity.
 
 ## What it enforces
 
@@ -24,6 +24,32 @@ Works with the Figma MCP (`get_metadata`, `get_design_context`, `get_screenshot`
 
 ## Install
 
+### Codex plugin
+
+Clone the repository and register its bundled marketplace:
+
+```bash
+git clone https://github.com/xtrair/figma-to-roblox-ui
+cd figma-to-roblox-ui
+codex plugin marketplace add .
+codex plugin add figma-to-roblox-ui@personal
+```
+
+If you already cloned the repository, run the last two commands from its root.
+The bundled marketplace uses the name `personal`; if another marketplace with
+that name is already configured, give this catalog a unique `name` in
+`.agents/plugins/marketplace.json` and use that name after `@` when installing.
+
+Start a new Codex task after installation and ask it to use `figma-to-roblox-ui`.
+The plugin includes the skill instructions only. Connect Figma and Roblox Studio
+MCP servers separately to read designs and modify an open Studio project.
+
+The plugin manifest is in `plugins/figma-to-roblox-ui/.codex-plugin/plugin.json`.
+See the [official plugin packaging documentation](https://developers.openai.com/plugins/build/plugins)
+for marketplace setup and plugin discovery.
+
+### Claude
+
 Claude Code / Agent SDK:
 
 ```bash
@@ -31,6 +57,21 @@ git clone https://github.com/xtrair/figma-to-roblox-ui ~/.claude/skills/figma-to
 ```
 
 Claude app: download the repo as a zip and upload it as a custom skill in the app settings.
+
+## Maintaining the Codex package
+
+The root `SKILL.md` is the source of truth. After editing it, refresh the bundled
+copy before committing:
+
+```bash
+python scripts/sync_codex_skill.py
+```
+
+To check that the bundled skill and license match their source files:
+
+```bash
+python scripts/sync_codex_skill.py --check
+```
 
 ## Not covered yet
 
