@@ -5,12 +5,13 @@ A Claude skill for importing Figma frames and designs into Roblox Studio GUI wit
 ## What it enforces
 
 - **Scale only, Offset = 0** — `Size`, `Position`, list/grid padding, `UIPadding`, `UIShadow`.
+- **AnchorPoint = (0.5, 0.5) by default**, so elements don't skew or drift when scaled. Edge/corner anchors are allowed only with an explicit reason (edge-pinned HUD, fill bars, one-way expanding elements).
 - **UIStroke** always in `StrokeSizingMode.ScaledSize` (`Thickness = strokeWeight / min(w, h)`).
 - **UICorner** in Scale (`radius / min(w, h)`, `0.5` = pill/circle), including per-corner radii.
 - **Detailed art and non-standard shapes are exported as images** (PNG → ImageLabel/ImageButton), while layout and text stay native — the way pro Roblox UI designers work.
 - Image limits handled: ≤ 1024 px, 9-slice, spritesheets, tiling for large art, `ImageColor3` tinting for color variants.
 - `TextScaled` + `UITextSizeConstraint` for all text.
-- A Luau **validator** that flags any leftover Offset, FixedSize strokes, px radii, non-scaled text or empty images.
+- A Luau **validator** that flags any leftover Offset, unjustified non-center anchors, FixedSize strokes, px radii, non-scaled text or empty images.
 
 ## Contents
 

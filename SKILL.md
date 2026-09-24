@@ -1,6 +1,6 @@
 ---
 name: "figma-to-roblox-ui"
-description: "Import Figma frames and designs into Roblox Studio GUI (ScreenGui/Frame/ImageLabel): Scale-only layout, UIStroke ScaledSize, UICorner in Scale, detailed art and custom shapes exported as images. Use for any Figma to Roblox UI transfer."
+description: "Import Figma frames and designs into Roblox Studio GUI (ScreenGui/Frame/ImageLabel): Scale-only layout, centered AnchorPoint, UIStroke ScaledSize, UICorner in Scale, detailed art and custom shapes exported as images. Use for any Figma to Roblox UI transfer."
 ---
 
 # Figma → Roblox GUI: high-fidelity import
@@ -10,11 +10,12 @@ Use this skill whenever a frame, screen, or component from Figma has to end up a
 ## 0. HARD RULES (never break these)
 
 1. **Scale everywhere, Offset = 0.** `Size`, `Position`, `UIListLayout.Padding`, `UIGridLayout.CellSize/CellPadding`, every `UIPadding` side, `UIShadow.Offset/BlurRadius/Spread` — Scale component only. Offset is always `0`.
-2. **UIStroke always uses `StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize`.** In this mode `Thickness` is a fraction of the *parent's shortest axis* (0.1 on a 200×300 frame = 20 px). Keep values between 0 and 1. `BorderOffset` is Scale too.
-3. **UICorner always uses Scale.** `CornerRadius = UDim.new(radius / min(w, h), 0)`. Scale is measured against the shortest side; `0.5` = full pill/circle. For different corners use `TopLeftRadius / TopRightRadius / BottomLeftRadius / BottomRightRadius` (also Scale). Do not set `CornerRadius` and per-corner radii at the same time.
-4. **Detailed art and non-standard shapes are exported from Figma as images and placed as ImageLabel/ImageButton** — never approximated with Frames (see section 2).
-5. Text: `TextScaled = true` + `UITextSizeConstraint` (MaxTextSize ≈ Figma size × 1.5, MinTextSize ≈ 8). No fixed `TextSize`.
-6. After every build, run the validator (section 8) and compare screenshots at several resolutions (section 9).
+2. **AnchorPoint = `Vector2.new(0.5, 0.5)` on every GuiObject by default**, so `Position` is the element's center. With a corner anchor like `(0, 0)`, UIAspectRatioConstraint, Size tweens and resolution changes shrink/grow the box toward that corner, so buttons and panels skew and drift away from their Figma spot. Use another anchor only when there is a concrete reason (section 4, "When not to center") and record it in the `AnchorReason` attribute so the validator accepts it.
+3. **UIStroke always uses `StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize`.** In this mode `Thickness` is a fraction of the *parent's shortest axis* (0.1 on a 200×300 frame = 20 px). Keep values between 0 and 1. `BorderOffset` is Scale too.
+4. **UICorner always uses Scale.** `CornerRadius = UDim.new(radius / min(w, h), 0)`. Scale is measured against the shortest side; `0.5` = full pill/circle. For different corners use `TopLeftRadius / TopRightRadius / BottomLeftRadius / BottomRightRadius` (also Scale). Do not set `CornerRadius` and per-corner radii at the same time.
+5. **Detailed art and non-standard shapes are exported from Figma as images and placed as ImageLabel/ImageButton** — never approximated with Frames (see section 2).
+6. Text: `TextScaled = true` + `UITextSizeConstraint` (MaxTextSize ≈ Figma size × 1.5, MinTextSize ≈ 8). No fixed `TextSize`.
+7. After every build, run the validator (section 8) and compare screenshots at several resolutions (section 9).
 
 ## 1. Prepare the Figma file (before export)
 
@@ -75,16 +76,26 @@ For an element (x, y, w, h) inside a parent (pw, ph), relative coordinates:
 
 ```
 Size      = UDim2.fromScale(w / pw, h / ph)
-Position  = UDim2.fromScale((x + w*ax) / pw, (y + h*ay) / ph)   -- ax,ay = AnchorPoint
+Position  = UDim2.fromScale((x + w*ax) / pw, (y + h*ay) / ph)   -- ax,ay = AnchorPoint (default 0.5, 0.5)
 Corner    = UDim.new(radius / min(w, h), 0)                       -- max 0.5
 Stroke    = Thickness = strokeWeight / min(w, h)  (ScaledSize)
 ListPad   = UDim.new(gap / pw, 0) (horizontal) | UDim.new(gap / ph, 0) (vertical)
 UIPadding = Left/Right: p / pw ; Top/Bottom: p / ph
 ```
 
-- Centered panels/buttons: `AnchorPoint = Vector2.new(0.5, 0.5)` — less drift on resize.
+- **Default AnchorPoint = (0.5, 0.5)**, so `Position = UDim2.fromScale((x + w/2) / pw, (y + h/2) / ph)`, the center of the Figma box. The `place` helper does this unless you pass another anchor.
+- A child's Position is always measured from the parent's top-left corner, whatever the parent's AnchorPoint, so the formulas stay the same at every level.
 - If the parent has UIPadding, pw/ph = its *inner* area.
 - Round Scale values to 4 decimals.
+
+### When not to center
+
+Change the anchor only when the element must stay glued to a side or grow from one side. Put the anchor on that side and set the `AnchorReason` attribute (the `place` helper does it for you):
+- **HUD pinned to a screen edge or corner** (currency top-left, menu buttons on the left edge, hotbar at the bottom): anchor on that edge/corner, e.g. `(0, 0)`, `(0, 0.5)`, `(0.5, 1)`, `(1, 1)`. With a center anchor, UIAspectRatioConstraint pulls it away from the edge on narrow and wide screens.
+- **Progress / health / XP bar fill** that grows through `Size.X`: `(0, 0.5)`, so it fills from the left.
+- **Dropdowns, tooltips, lists with AutomaticSize** that must expand in one direction: anchor on the side that stays fixed (usually the top, `(0.5, 0)`).
+
+Everything else (panels, buttons, icons, text, images, slots) stays `(0.5, 0.5)`.
 
 ### Keeping proportions
 Scale on both axes stretches elements on wide/narrow screens, so:
@@ -96,6 +107,7 @@ Scale on both axes stretches elements on wide/narrow screens, so:
 
 | Figma | Roblox |
 |---|---|
+| Layer x/y | `AnchorPoint = (0.5, 0.5)`, `Position` = center of the layer box in Scale (section 4) |
 | Rectangle frame with fill | `Frame` (BackgroundColor3, BackgroundTransparency = 1 − opacity) |
 | Frame without fill | `Frame`, BackgroundTransparency = 1 |
 | Non-standard shape / detailed art | `ImageLabel`/`ImageButton` with exported PNG (section 2), BackgroundTransparency = 1 |
@@ -127,17 +139,23 @@ Scale on both axes stretches elements on wide/narrow screens, so:
 1. `ScreenGui` in StarterGui: `ResetOnSpawn = false`, `ZIndexBehavior = Sibling`, `IgnoreGuiInset` as in the mockup (usually true for full-screen, false for HUD), `ScreenInsets = CoreUISafeInsets` for mobile.
 2. Build the tree top-down in one Luau script (through `execute_luau` in the Roblox Studio MCP) using the helpers below, so Offset physically can't appear.
 3. Containers + layouts first, then native visuals (Corner/Stroke/Gradient/Shadow), then images, then text on top.
-4. Buttons: hover/press animations with TweenService on `Size` (Scale) — **not** `UIScale`: UIScale mis-scales UIStrokes in ScaledSize mode (known bug, March 2026).
+4. Buttons: hover/press animations with TweenService on `Size` (Scale). With AnchorPoint (0.5, 0.5) the button grows and shrinks evenly around its center. Do **not** use `UIScale`: it mis-scales UIStrokes in ScaledSize mode (known bug, March 2026).
 
 ### Helpers (Luau)
 
 ```lua
 local function S(x, y) return UDim2.fromScale(x, y) end
 local function r4(n) return math.floor(n * 10000 + 0.5) / 10000 end
+local CENTER = Vector2.new(0.5, 0.5)
 
--- Figma px -> Scale relative to the parent
-local function place(obj, x, y, w, h, pw, ph, anchor)
-	anchor = anchor or Vector2.zero
+-- Figma px -> Scale relative to the parent. Anchor is the center unless a
+-- non-center anchor is passed together with the reason for it (section 4).
+local function place(obj, x, y, w, h, pw, ph, anchor, reason)
+	anchor = anchor or CENTER
+	if anchor ~= CENTER then
+		assert(reason, obj.Name .. ": non-center AnchorPoint needs a reason")
+		obj:SetAttribute("AnchorReason", reason)
+	end
 	obj.AnchorPoint = anchor
 	obj.Size = S(r4(w / pw), r4(h / ph))
 	obj.Position = S(r4((x + w * anchor.X) / pw), r4((y + h * anchor.Y) / ph))
@@ -178,12 +196,12 @@ local function text(obj, figmaSize)
 end
 
 -- exported artwork (non-standard shape / detailed element)
-local function image(parent, name, assetId, x, y, w, h, pw, ph, anchor, slice)
+local function image(parent, name, assetId, x, y, w, h, pw, ph, slice, anchor, anchorReason)
 	local i = Instance.new("ImageLabel")
 	i.Name = name
 	i.BackgroundTransparency = 1
 	i.Image = assetId
-	place(i, x, y, w, h, pw, ph, anchor)
+	place(i, x, y, w, h, pw, ph, anchor, anchorReason)
 	if slice then
 		i.ScaleType = Enum.ScaleType.Slice
 		i.SliceCenter = slice.center
@@ -211,6 +229,7 @@ for _, d in root:GetDescendants() do
 	if d:IsA("GuiObject") then
 		if udim2(d.Size) then table.insert(bad, p .. " Size offset") end
 		if udim2(d.Position) then table.insert(bad, p .. " Position offset") end
+		if d.AnchorPoint ~= Vector2.new(0.5, 0.5) and not d:GetAttribute("AnchorReason") then table.insert(bad, p .. " AnchorPoint not center (set AnchorReason if intentional)") end
 		if (d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox")) and not d.TextScaled then table.insert(bad, p .. " TextScaled=false") end
 		if (d:IsA("ImageLabel") or d:IsA("ImageButton")) and d.Image == "" then table.insert(bad, p .. " empty Image") end
 	elseif d:IsA("UIStroke") then
@@ -234,7 +253,7 @@ for _, d in root:GetDescendants() do
 		if udim2(d.Offset) or udim(d.BlurRadius) or udim(d.Spread) then table.insert(bad, p .. " Shadow offset") end
 	end
 end
-print(#bad == 0 and "OK: everything is Scale" or table.concat(bad, "\n"))
+print(#bad == 0 and "OK: everything is Scale and centered" or table.concat(bad, "\n"))
 ```
 
 If the output is not `OK`, fix and rerun until it is clean.
@@ -247,6 +266,7 @@ If the output is not `OK`, fix and rerun until it is clean.
 
 ## 10. Common mistakes
 
+- **Buttons skew or drift when resized, on other screens or during hover tweens** → AnchorPoint left at `(0, 0)`. Use `(0.5, 0.5)`; other anchors only for edge-pinned HUD, fill bars and one-way expanding elements (section 4).
 - **Elements drift apart on other screens** → missing UIAspectRatioConstraint on root panels, or coordinates computed from the root instead of the direct parent.
 - **Custom shape rebuilt from Frames looks cheap/wrong** → it should have been an exported image (section 2).
 - **Stroke thickness differs on same-style buttons** → in ScaledSize thickness depends on min(w,h); compute Thickness per size with the formula, don't copy the number.
@@ -255,4 +275,4 @@ If the output is not `OK`, fix and rerun until it is clean.
 - **Text size differs between neighboring buttons** → TextScaled fits the box; equalize TextLabel heights and MaxTextSize.
 - **Blurry art** → image > 1024 or stretched beyond its source; see section 2.
 - **Text baked into images** → blurry, can't be changed from scripts or localized; keep it as TextLabel unless it is a stylized title.
-- **Plugins (FigBloxUI, RoImport, Bloxporter, Figma To Roblox)** save time, but ALWAYS run their output through the validator: they can leave Offset, FixedSize strokes and px radii. Figma components/variants don't carry over — they become plain instances.
+- **Plugins (FigBloxUI, RoImport, Bloxporter, Figma To Roblox)** save time, but ALWAYS run their output through the validator: they can leave Offset, `(0, 0)` anchors, FixedSize strokes and px radii. Figma components/variants don't carry over — they become plain instances.
